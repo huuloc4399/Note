@@ -17,11 +17,11 @@ default_settings = {
     "fg_color": "#000000"
 }
 
-settings = None
-current_note_index = None
-list_window = None
+settings = None #Luu tam thoi setting
+current_note_index = None #Luu chi so note dang edit, None nghia la dang tao note moi
+list_window = None #cua so hien thi cac ghi chu da luu
 note_listbox = None
-notes_data = []
+notes_data = [] #du lieu tat ca ghi chu da luu trong note.json
 # defs
 def load_settings():
     global settings
@@ -51,7 +51,21 @@ def apply_settings():
         fg=settings["fg_color"],
         insertbackground=settings["fg_color"]
     )
-
+#load note khi bat dau chuong trinh
+def load_notes_data():
+    global notes_data
+    if os.path.exists(DEFAULT_FILE):
+        try:
+            with open(DEFAULT_FILE, "r", encoding="utf-8") as f:
+                notes_data = json.load(f)
+                if not isinstance(notes_data, list):
+                    notes_data = [notes_data] if notes_data else []
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Không thể tải ghi chú: {e}")
+            notes_data = []
+    else:
+        notes_data = []
+#clean cua so tao note moi
 def new_note():
     global current_note_index
     current_note_index = None
@@ -61,19 +75,19 @@ def new_note():
     date_create_entry.delete(0, tk.END)
     date_create_entry.config(state="readonly")
     root.title("Note - New Note")
-
+#luu note hien tai
 def save_current_note():
     global current_note_index, notes_data, note_listbox
     title = title_entry.get().strip()
     content = text_area.get("1.0", tk.END).strip()
     created = date_create_entry.get()
     updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+    #kiem tra tieu de hoac noi dung rong
     if not title or not content:
         messagebox.showwarning("Thiếu thông tin", "Vui lòng nhập cả tiêu đề và nội dung.")
         return
     file_path = DEFAULT_FILE
-    
+    #kiem tra tieu de da ton tai
     if os.path.exists(file_path):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -88,7 +102,7 @@ def save_current_note():
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể kiểm tra ghi chú: {e}")
             return
-    
+    #Doi voi file ghi chu moi se khong co ngay created nen se dung updated de lam ngay tao
     if not created:
         created = updated
         date_create_entry.config(state="normal")
@@ -101,12 +115,12 @@ def save_current_note():
         "Created": created,
         "Updated": updated
     }
-
+    #tao file note.json moi neu chua co note
     file_path = DEFAULT_FILE
     if not os.path.exists(file_path):
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump([], f)
-
+#luu note
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             notes_data = json.load(f)
@@ -134,6 +148,7 @@ def save_current_note():
         current_note_index = None 
     except Exception as e:
         messagebox.showerror("Lỗi", f"Không thể lưu ghi chú: {e}")
+#xoa ghi chu dang duoc chon
 def del_current_note(selected_index):
     global notes_data, note_listbox
     if selected_index[0] is None:
@@ -141,11 +156,11 @@ def del_current_note(selected_index):
         return
     if messagebox.askyesno("Xác nhận", "Bạn có chắc muốn xóa ghi chú này?"):
         try:
-            notes_data.pop(selected_index[0])
+            notes_data.pop(selected_index[0]) #xoa
             with open(DEFAULT_FILE, "w", encoding="utf-8") as f:
                 json.dump(notes_data, f, indent=4, ensure_ascii=False)
             if list_window and note_listbox and list_window.winfo_exists():
-                notes_data.sort(key=lambda x: x.get("Updated", ""), reverse=True)
+                notes_data.sort(key=lambda x: x.get("Updated", ""), reverse=True) #sort theo ngay update
                 note_listbox.delete(0, tk.END)
                 for note in notes_data:
                     updated = note.get("Updated", "Unknown")
@@ -153,20 +168,22 @@ def del_current_note(selected_index):
                     note_listbox.insert(tk.END, f"{updated} - {title}")
 
             messagebox.showinfo("Thành công", "Ghi chú đã được xóa.")
-            selected_index[0] = None
+            selected_index[0] = None #da xoa huy chon
         except Exception as e:
-            os.remove(DEFAULT_FILE)
-            messagebox.showinfo("Thành công", "Ghi chú đã được xóa.")
+            messagebox.showerror("error",{e})
 def open_note():
-    file_path = "note.json"
-    if not file_path:
+    global notes_data, list_window, note_listbox
+    load_notes_data()
+    #check note
+    if not notes_data:
+        messagebox.showerror("Lỗi", "Không có ghi chú nào để mở! Hãy tạo ghi chú mới.")
         return
 
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(DEFAULT_FILE, "r", encoding="utf-8") as file:
             notes = json.load(file)
 
-        notes.sort(key=lambda x: x.get("Updated", ""), reverse=True)
+        #notes.sort(key=lambda x: x.get("Updated", ""), reverse=True)
         list_window = tk.Toplevel()
         list_window.title("Danh sách ghi chú")
 
@@ -187,12 +204,12 @@ def open_note():
             listbox.insert(tk.END, f"{updated} - {title}")
 
         selected_index = [None]
-
+        #chon note
         def on_select(event):
             if listbox.curselection():
                 index = listbox.curselection()[0]
                 selected_index[0] = index
-                note = notes[index]
+                note = notes_data[index]
                 content = f"Tiêu đề: {note.get('Title', '')}\n"
                 content += f"Ngày tạo: {note.get('Created', '')}\n"
                 content += f"Cập nhật: {note.get('Updated', '')}\n\n"
@@ -201,7 +218,7 @@ def open_note():
                 preview.insert(tk.END, content)
 
         listbox.bind('<<ListboxSelect>>', on_select)
-
+        #edit
         def edit_note():
             global current_note_index
             if selected_index[0] is None:
@@ -209,7 +226,7 @@ def open_note():
                 return
 
             current_note_index = selected_index[0]
-            note = notes[current_note_index]
+            note = notes_data[current_note_index]
             text_area.delete(1.0, tk.END)
             text_area.insert(tk.END, note.get("Content", ""))
             title_entry.delete(0, tk.END)
